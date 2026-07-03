@@ -1,4 +1,4 @@
-import { PageContainer, CardPanel, PrimaryButton, SectionWrapper, StatusBadge } from "@/components/ui-foundations";
+import { CardPanel, PageContainer, PrimaryButton, SectionWrapper, StatusBadge } from "@/components/ui-foundations";
 
 const classLabels: Record<string, string> = {
   a: "A osztály",
@@ -9,10 +9,11 @@ const classLabels: Record<string, string> = {
 export default async function ConfirmationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ osztaly?: string }>;
+  searchParams: Promise<{ osztaly?: string; mod?: string }>;
 }) {
   const params = await searchParams;
   const classLabel = classLabels[params.osztaly ?? ""] ?? "kiválasztott osztály";
+  const isMockMode = params.mod === "mock";
 
   return (
     <PageContainer>
@@ -23,17 +24,18 @@ export default async function ConfirmationPage({
             Köszönjük a jelentkezést!
           </h1>
           <p className="mt-4 text-base leading-8 text-muted-foreground">
-            A {classLabel.toLowerCase()} számára kitöltött minta jelentkezési lap sikeresen
-            elkészült. Ebben a verzióban még nincs adatbázis vagy e-mail küldés, így ez az oldal a
-            publikus sikerélményt modellezi.
+            A {classLabel.toLowerCase()} számára kitöltött jelentkezési lap sikeresen elkészült.
+            {isMockMode
+              ? " Jelenleg minta módban fut az alkalmazás, mert a Supabase környezeti változói hiányoznak."
+              : " Az adatokat a Supabase adatbázis fogadta."}
           </p>
 
           <div className="mt-8 rounded-[10px] border border-[color:var(--border)] bg-[color:var(--surface-subtle)] p-6">
             <h2 className="text-lg font-semibold text-foreground">Mi jön ezután?</h2>
             <ul className="mt-4 space-y-2 text-sm leading-7 text-muted-foreground">
-              <li>A későbbi verzió valódi háttérrendszerbe fogja menteni a jelentkezést.</li>
-              <li>A szervezők admin felületen követhetik majd a beérkezett adatokat.</li>
-              <li>A családok visszaigazoló üzenetet is kaphatnak a végleges folyamatban.</li>
+              <li>A szervezők admin felületen követhetik a beérkezett jelentkezést.</li>
+              <li>A későbbi verzióban e-mailes visszaigazolás is kapcsolható ehhez a folyamathoz.</li>
+              <li>Ha valamit módosítani kell, a szervezők az admin oldalon tudják kezelni.</li>
             </ul>
           </div>
 

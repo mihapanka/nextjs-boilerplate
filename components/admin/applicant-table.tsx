@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Applicant } from "@/lib/mock-admin-data";
+import { Applicant } from "@/lib/registration-types";
 import { AdminStatusBadge } from "@/components/admin/status-badge";
 
 export function ApplicantTable({ applicants }: { applicants: Applicant[] }) {
@@ -28,39 +28,50 @@ export function ApplicantTable({ applicants }: { applicants: Applicant[] }) {
           </tr>
         </thead>
         <tbody>
-          {applicants.map((applicant) => (
-            <tr key={applicant.id} className="align-top">
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm">
-                <Link
-                  href={`/admin/jelentkezok/${applicant.id}`}
-                  className="font-semibold text-foreground hover:underline"
-                >
-                  {applicant.studentName}
-                </Link>
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-foreground">
-                {applicant.classType}
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm">
-                <AdminStatusBadge status={applicant.status} />
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
-                {applicant.studentEmail}
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
-                {applicant.guardianEmail || "Hiányzik"}
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
-                {applicant.allergies || "Nincs"}
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-foreground">
-                {applicant.enrolled ? "Igen" : "Nem"}
-              </td>
-              <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
-                {applicant.lastUpdated}
+          {applicants.length === 0 ? (
+            <tr>
+              <td
+                colSpan={8}
+                className="border-b border-[color:var(--border)] px-4 py-8 text-sm text-muted-foreground"
+              >
+                Jelenleg nincs megjeleníthető jelentkező a kiválasztott szűrőkkel.
               </td>
             </tr>
-          ))}
+          ) : (
+            applicants.map((applicant) => (
+              <tr key={applicant.id} className="align-top">
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm">
+                  <Link
+                    href={`/admin/jelentkezok/${applicant.id}`}
+                    className="font-semibold text-foreground hover:underline"
+                  >
+                    {applicant.studentName}
+                  </Link>
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-foreground">
+                  {applicant.classType}
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm">
+                  <AdminStatusBadge status={applicant.status} />
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
+                  {applicant.studentEmail}
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
+                  {applicant.guardianEmail || "Hiányzik"}
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
+                  {applicant.allergies || "Nincs"}
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-foreground">
+                  {applicant.enrolled ? "Igen" : "Nem"}
+                </td>
+                <td className="border-b border-[color:var(--border)] px-4 py-4 text-sm text-muted-foreground">
+                  {applicant.lastUpdated}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dobó Gólyatábor regisztrációs rendszer
 
-## Getting Started
+Ez a projekt egy Next.js alapú Dobó Gólyatábor alkalmazás, amely tartalmazza:
 
-First, run the development server:
+- publikus jelentkezési folyamatot A, B és NY osztály számára
+- admin áttekintő és kezelőfelületeket
+- Supabase integrációt valós jelentkezések mentéséhez és betöltéséhez
+- mock fallback módot arra az esetre, ha a Supabase környezeti változók még nincsenek beállítva
+
+## Fejlesztői indítás
+
+Először telepítsd a függőségeket, majd indítsd a fejlesztői szervert:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Az alkalmazás alapértelmezetten a `http://localhost:3000` címen érhető el.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase beállítás
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 1. Supabase projekt létrehozása
 
-## Learn More
+1. Hozz létre egy új projektet a [Supabase](https://supabase.com/) felületén.
+2. Nyisd meg a projekt `Settings > API` oldalát.
+3. Másold ki az alábbi értékeket:
+   - `Project URL`
+   - `anon public` kulcs
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Környezeti változók
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+A projekt gyökerében hozz létre egy `.env.local` fájlt az alábbi tartalommal:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
 
-## Deploy on Vercel
+Fontos:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ne írj kulcsot közvetlenül a kódba
+- a publikus kliensoldali kapcsolódáshoz csak a `NEXT_PUBLIC_SUPABASE_ANON_KEY` kulcsot használd
+- a jelenlegi verzió kizárólag ezeket a környezeti változókat várja
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 3. Adatbázis séma létrehozása
+
+A szükséges SQL a `supabase/schema.sql` fájlban található.
+
+Lépések:
+
+1. Nyisd meg a Supabase projekt `SQL Editor` felületét.
+2. Másold be a `supabase/schema.sql` teljes tartalmát.
+3. Futtasd le az SQL-t.
+
+A séma létrehozza a `registrations` táblát az alábbi fő mezőkkel:
+
+- `class_type`
+- `status`
+- `student_name`, `student_email`, `student_phone`
+- `guardian_name`, `guardian_email`, `guardian_phone`
+- `food_allergy`, `health_note`, `other_note`
+- `consent_privacy`, `consent_parent`, `consent_photo_video`
+- `organizer_notes`
+- `enrolled`
+- `created_at`, `updated_at`
+
+Alapértelmezések:
+
+- `status = 'új jelentkezés'`
+- `enrolled = false`
+
+### 4. RLS és jelenlegi hozzáférés
+
+A mellékelt SQL egyszerű, fejlesztésbarát RLS policy-kat hoz létre, hogy:
+
+- a publikus jelentkezési űrlap tudjon beszúrni új rekordot
+- az admin felület tudjon listázni és módosítani rekordokat
+
+Ez a jelenlegi körben még nem tartalmaz külön authentikációt vagy szigorú admin jogosultságkezelést. Ezeket egy későbbi lépésben érdemes szűkíteni.
+
+## Hogyan működik a fallback mód
+
+Ha bármelyik Supabase környezeti változó hiányzik, az alkalmazás nem áll le.
+
+Ilyenkor:
+
+- a publikus jelentkezési folyamat minta módban fut
+- az admin oldalak mock adatokat mutatnak
+- a felület jelzi, hogy nem élő adatforrást használ
+
+Ez hasznos fejlesztéshez, demóhoz és UI validációhoz.
+
+## Lokális tesztelés
+
+### Publikus jelentkezés tesztelése
+
+1. állítsd be a `.env.local` fájlt
+2. futtasd a `supabase/schema.sql` sémát a projektedben
+3. indítsd el a fejlesztői szervert: `npm run dev`
+4. nyisd meg például a következő oldalt:
+   - `http://localhost:3000/jelentkezes/a`
+5. töltsd ki a több lépéses űrlapot
+6. küldd be a jelentkezést
+7. ellenőrizd, hogy a rekord megjelent-e a Supabase `registrations` táblában
+8. ellenőrizd az admin oldalak egyikét:
+   - `http://localhost:3000/admin`
+   - `http://localhost:3000/admin/jelentkezok`
+   - `http://localhost:3000/admin/beiratkozas`
+
+### Mit kell látnod sikeres teszt esetén
+
+- a beküldés után megjelenik a visszaigazoló oldal
+- az admin dashboard valós statisztikákat mutat
+- a jelentkezőlista a Supabase rekordokat tölti be
+- az egyedi adatlapról menthető a státusz, a szervezői jegyzet és a beiratkozási állapot
+
+## Jelenlegi határok
+
+Ebben a verzióban még nincs:
+
+- email küldés
+- Supabase Auth vagy más authentikáció
+- szerepkör alapú admin jogosultságkezelés
+- AI funkció
+
+A cél most az, hogy a publikus űrlap és az admin oldalak már valós Supabase adatokkal működjenek, miközben a mostani letisztult fehér UI megmarad.

@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Applicant, ApplicantStatus } from "@/lib/mock-admin-data";
+import { Applicant, ApplicantStatus, RegistrationDataMode } from "@/lib/registration-types";
 import { AdminStatusBadge } from "@/components/admin/status-badge";
 import { DetailPanel } from "@/components/admin/detail-panel";
-import { CardPanel, FieldLabel, FormInput, HelperText, PrimaryButton, SecondaryButton } from "@/components/ui-foundations";
+import {
+  CardPanel,
+  FieldLabel,
+  HelperText,
+  PrimaryButton,
+  SecondaryButton,
+  StatusBadge,
+} from "@/components/ui-foundations";
 
 const statuses: ApplicantStatus[] = [
   "új jelentkezés",
@@ -16,12 +23,113 @@ const statuses: ApplicantStatus[] = [
   "várólista",
 ];
 
-export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
+export function ApplicantDetailClient({
+  applicant,
+  mode,
+  error,
+}: {
+  applicant: Applicant;
+  mode: RegistrationDataMode;
+  error: string | null;
+}) {
   const [status, setStatus] = useState<ApplicantStatus>(applicant.status);
   const [organizerNotes, setOrganizerNotes] = useState(applicant.organizerNotes);
+  const [enrolled, setEnrolled] = useState(applicant.enrolled);
+  const [lastUpdated, setLastUpdated] = useState(applicant.lastUpdated);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveMessage(null);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(`/api/registrations/${applicant.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+          organizerNotes,
+          enrolled,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        ok: boolean;
+        mode?: RegistrationDataMode;
+        error?: string;
+        applicant?: Applicant | null;
+      };
+
+      if (!response.ok || !result.ok) {
+        setSaveError(result.error ?? "A módosítások mentése nem sikerült.");
+        return;
+      }
+
+      if (result.applicant) {
+        setStatus(result.applicant.status);
+        setOrganizerNotes(result.applicant.organizerNotes);
+        setEnrolled(result.applicant.enrolled);
+        setLastUpdated(result.applicant.lastUpdated);
+      }
+
+      if (result.mode === "mock") {
+        setSaveMessage(
+          "Minta módban fut a felület, ezért a változás csak ezen a képernyőn látszik, de az űrlap mentési folyamata rendben lefutott."
+        );
+        setLastUpdated(new Intl.DateTimeFormat("hu-HU", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date()));
+      } else {
+        setSaveMessage("A módosítások sikeresen elmentve a Supabase adatbázisba.");
+      }
+    } catch {
+      setSaveError("Hálózati hiba történt a mentés közben. Kérjük, próbáld újra.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {mode === "mock" ? (
+        <CardPanel className="p-5">
+          <StatusBadge tone="accent">Minta mód</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">
+            A Supabase környezeti változói hiányoznak, ezért ez az adatlap mintaadatokkal működik.
+          </p>
+        </CardPanel>
+      ) : null}
+
+      {error ? (
+        <CardPanel className="p-5">
+          <StatusBadge>Betöltési figyelmeztetés</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{error}</p>
+        </CardPanel>
+      ) : null}
+
+      {saveMessage ? (
+        <CardPanel className="p-5">
+          <StatusBadge tone="accent">Mentés kész</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{saveMessage}</p>
+        </CardPanel>
+      ) : null}
+
+      {saveError ? (
+        <CardPanel className="p-5">
+          <StatusBadge>Mentési hiba</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{saveError}</p>
+        </CardPanel>
+      ) : null}
+
       <CardPanel className="p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -32,7 +140,7 @@ export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
               {applicant.studentName}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {applicant.classType} osztály • utolsó módosítás: {applicant.lastUpdated}
+              {applicant.classType} osztály • utolsó módosítás: {lastUpdated}
             </p>
           </div>
           <AdminStatusBadge status={status} />
@@ -47,7 +155,7 @@ export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
               ["Osztály", applicant.classType],
               ["Email", applicant.studentEmail],
               ["Telefonszám", applicant.studentPhone || "Nincs megadva"],
-              ["Beiratkozott", applicant.enrolled ? "Igen" : "Nem"],
+              ["Beiratkozott", enrolled ? "Igen" : "Nem"],
             ]}
           />
         </DetailPanel>
@@ -76,7 +184,10 @@ export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
           <InfoList
             rows={[
               ["Adatkezelési tájékoztató", applicant.acceptsPrivacy ? "Elfogadva" : "Nincs elfogadva"],
-              ["Szülői tudomásulvétel", applicant.guardianAcknowledgement ? "Megerősítve" : "Nincs megerősítve"],
+              [
+                "Szülői tudomásulvétel",
+                applicant.guardianAcknowledgement ? "Megerősítve" : "Nincs megerősítve",
+              ],
               ["Fotó / videó hozzájárulás", applicant.mediaConsent ? "Igen" : "Nem"],
             ]}
           />
@@ -88,7 +199,7 @@ export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
           <label className="block">
             <FieldLabel>Státusz módosítása</FieldLabel>
             <HelperText>
-              Ez most csak helyi UI állapot, adatbázis mentés még nincs.
+              A kiválasztott státusz a mentés után a Supabase bejegyzésben is frissül.
             </HelperText>
             <select
               value={status}
@@ -102,13 +213,23 @@ export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
               ))}
             </select>
           </label>
+
+          <label className="mt-5 flex items-center gap-3 rounded-[10px] border border-[color:var(--border)] bg-[color:var(--surface-subtle)] px-4 py-3">
+            <input
+              type="checkbox"
+              checked={enrolled}
+              onChange={(event) => setEnrolled(event.target.checked)}
+              className="h-4 w-4 rounded border-[color:var(--border-strong)]"
+            />
+            <span className="text-sm font-semibold text-foreground">Beiratkozott</span>
+          </label>
         </DetailPanel>
 
         <DetailPanel title="Szervezői megjegyzések">
           <label className="block">
             <FieldLabel>Jegyzet</FieldLabel>
             <HelperText>
-              Ez a mező jelenleg csak a böngészőben módosul, mentés nélkül.
+              A szervezői megjegyzések itt szerkeszthetők és menthetők a jelentkező rekordjára.
             </HelperText>
             <textarea
               value={organizerNotes}
@@ -141,7 +262,9 @@ export function ApplicantDetailClient({ applicant }: { applicant: Applicant }) {
 
       <div className="flex flex-wrap gap-3">
         <SecondaryButton href="/admin/jelentkezok">Vissza a jelentkezők listájához</SecondaryButton>
-        <PrimaryButton type="button">Változások áttekintése</PrimaryButton>
+        <PrimaryButton type="button" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? "Mentés folyamatban..." : "Módosítások mentése"}
+        </PrimaryButton>
       </div>
     </div>
   );

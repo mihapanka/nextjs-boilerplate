@@ -13,11 +13,10 @@ import {
   SecondaryButton,
   StatusBadge,
 } from "@/components/ui-foundations";
-
-type ClassKey = "a" | "b" | "ny";
+import { ApplicantClass } from "@/lib/registration-types";
 
 type RegistrationFlowProps = {
-  classKey: ClassKey;
+  classKey: "a" | "b" | "ny";
   classLabel: string;
   intro: string;
 };
@@ -54,6 +53,8 @@ export function RegistrationFlow({
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<string[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     studentName: "",
     studentEmail: "",
@@ -120,13 +121,62 @@ export function RegistrationFlow({
 
   const previousStep = () => {
     setErrors([]);
+    setSubmitError(null);
     setStep((current) => Math.max(current - 1, 0));
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSubmitError(null);
+
     if (!validateStep(step)) return;
-    router.push(`/jelentkezes/visszaigazolas?osztaly=${classKey}`);
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/registrations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          classType: formData.schoolClass as ApplicantClass,
+          studentName: formData.studentName,
+          studentEmail: formData.studentEmail,
+          studentPhone: formData.studentPhone,
+          guardianName: formData.guardianName,
+          guardianEmail: formData.guardianEmail,
+          guardianPhone: formData.guardianPhone,
+          foodAllergy: formData.allergies,
+          healthNote: formData.healthNotes,
+          otherNote: formData.additionalNotes,
+          consentPrivacy: formData.acceptsPrivacy,
+          consentParent: formData.guardianAcknowledgement,
+          consentPhotoVideo: formData.mediaConsent,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        ok: boolean;
+        mode?: "supabase" | "mock";
+        error?: string;
+      };
+
+      if (!response.ok || !result.ok) {
+        setSubmitError(
+          result.error ?? "A jelentkezést most nem sikerült elmenteni. Kérjük, próbáld újra később."
+        );
+        return;
+      }
+
+      router.push(`/jelentkezes/visszaigazolas?osztaly=${classKey}&mod=${result.mode ?? "supabase"}`);
+    } catch {
+      setSubmitError(
+        "Hálózati hiba történt a jelentkezés beküldése közben. Kérjük, próbáld újra."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -206,8 +256,9 @@ export function RegistrationFlow({
                 {stepTitles[step]}
               </p>
               <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                Töltsd ki az alábbi adatokat nyugodtan, átlátható lépésekben. A jelenlegi verzió
-                csak a felhasználói felületet modellezi, az adatok nem kerülnek szerverre.
+                Töltsd ki az alábbi adatokat nyugodtan, átlátható lépésekben. A Supabase kapcsolat
+                be van készítve, de ha a környezeti változók hiányoznak, a rendszer minta módban
+                működik tovább.
               </p>
             </div>
 
@@ -222,23 +273,23 @@ export function RegistrationFlow({
               </div>
             ) : null}
 
+            {submitError ? (
+              <div className="mt-6 rounded-[10px] border border-[#ead9cf] bg-[#fcf8f6] p-4 text-sm text-[#8a4424]">
+                {submitError}
+              </div>
+            ) : null}
+
             <form onSubmit={handleSubmit} className="mt-8">
               {step === 0 ? (
                 <div className="grid gap-5 md:grid-cols-2">
-                  <FieldGroup
-                    label="Teljes név"
-                    helper="A diák neve úgy, ahogyan a jelentkezésben szerepeljen."
-                  >
+                  <FieldGroup label="Teljes név" helper="A diák neve úgy, ahogyan a jelentkezésben szerepeljen.">
                     <FormInput
                       value={formData.studentName}
                       onChange={(event) => updateField("studentName", event.target.value)}
                       placeholder="Például: Kovács Anna"
                     />
                   </FieldGroup>
-                  <FieldGroup
-                    label="Email cím"
-                    helper="Ide érkezhet később a visszaigazolás és a tájékoztató."
-                  >
+                  <FieldGroup label="Email cím" helper="Ide érkezhet később a visszaigazolás és a tájékoztató.">
                     <FormInput
                       type="email"
                       value={formData.studentEmail}
@@ -246,10 +297,7 @@ export function RegistrationFlow({
                       placeholder="pelda@email.hu"
                     />
                   </FieldGroup>
-                  <FieldGroup
-                    label="Telefonszám"
-                    helper="A diák saját elérhetősége, ha van."
-                  >
+                  <FieldGroup label="Telefonszám" helper="A diák saját elérhetősége, ha van.">
                     <FormInput
                       type="tel"
                       value={formData.studentPhone}
@@ -257,10 +305,7 @@ export function RegistrationFlow({
                       placeholder="+36 30 123 4567"
                     />
                   </FieldGroup>
-                  <FieldGroup
-                    label="Osztály"
-                    helper="Az útvonal alapján automatikusan kitöltve."
-                  >
+                  <FieldGroup label="Osztály" helper="Az útvonal alapján automatikusan kitöltve.">
                     <FormInput value={formData.schoolClass} readOnly />
                   </FieldGroup>
                 </div>
@@ -268,20 +313,14 @@ export function RegistrationFlow({
 
               {step === 1 ? (
                 <div className="grid gap-5 md:grid-cols-2">
-                  <FieldGroup
-                    label="Szülő / gondviselő neve"
-                    helper="Ő lesz az elsődleges kapcsolattartó."
-                  >
+                  <FieldGroup label="Szülő / gondviselő neve" helper="Ő lesz az elsődleges kapcsolattartó.">
                     <FormInput
                       value={formData.guardianName}
                       onChange={(event) => updateField("guardianName", event.target.value)}
                       placeholder="Például: Kovács Éva"
                     />
                   </FieldGroup>
-                  <FieldGroup
-                    label="Szülő / gondviselő email címe"
-                    helper="Ezen az email címen is elérhető a család."
-                  >
+                  <FieldGroup label="Szülő / gondviselő email címe" helper="Ezen az email címen is elérhető a család.">
                     <FormInput
                       type="email"
                       value={formData.guardianEmail}
@@ -397,19 +436,21 @@ export function RegistrationFlow({
                 <PrimaryButton
                   type="button"
                   onClick={previousStep}
-                  disabled={step === 0}
-                  className="bg-white text-foreground border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
+                  disabled={step === 0 || isSubmitting}
+                  className="border-[color:var(--border-strong)] bg-white text-foreground hover:bg-[color:var(--surface-subtle)]"
                 >
                   Vissza
                 </PrimaryButton>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
                   {step < stepTitles.length - 1 ? (
-                    <PrimaryButton type="button" onClick={nextStep}>
+                    <PrimaryButton type="button" onClick={nextStep} disabled={isSubmitting}>
                       Tovább
                     </PrimaryButton>
                   ) : (
-                    <PrimaryButton type="submit">Jelentkezés beküldése</PrimaryButton>
+                    <PrimaryButton type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? "Beküldés folyamatban..." : "Jelentkezés beküldése"}
+                    </PrimaryButton>
                   )}
                 </div>
               </div>

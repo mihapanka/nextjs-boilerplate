@@ -1,15 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Applicant } from "@/lib/mock-admin-data";
-import { CardPanel, FieldLabel } from "@/components/ui-foundations";
+import { Applicant, RegistrationDataMode } from "@/lib/registration-types";
+import { CardPanel, FieldLabel, StatusBadge } from "@/components/ui-foundations";
 import { AdminStatusBadge } from "@/components/admin/status-badge";
 
-export function EnrollmentPageClient({ applicants }: { applicants: Applicant[] }) {
+export function EnrollmentPageClient({
+  applicants,
+  mode,
+  error,
+}: {
+  applicants: Applicant[];
+  mode: RegistrationDataMode;
+  error: string | null;
+}) {
   const [classFilter, setClassFilter] = useState("összes");
   const [localEnrolled, setLocalEnrolled] = useState<Record<string, boolean>>(
     Object.fromEntries(applicants.map((applicant) => [applicant.id, applicant.enrolled]))
   );
+  const [savingIds, setSavingIds] = useState<string[]>([]);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const visibleApplicants = useMemo(() => {
     return applicants.filter(
@@ -17,8 +28,95 @@ export function EnrollmentPageClient({ applicants }: { applicants: Applicant[] }
     );
   }, [applicants, classFilter]);
 
+  const handleToggle = async (id: string, checked: boolean) => {
+    setLocalEnrolled((current) => ({
+      ...current,
+      [id]: checked,
+    }));
+    setSavingIds((current) => [...current, id]);
+    setFeedback(null);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(`/api/registrations/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enrolled: checked }),
+      });
+
+      const result = (await response.json()) as {
+        ok: boolean;
+        mode?: RegistrationDataMode;
+        error?: string;
+        applicant?: Applicant | null;
+      };
+
+      if (!response.ok || !result.ok) {
+        setSaveError(result.error ?? "A beiratkozási állapot mentése nem sikerült.");
+        setLocalEnrolled((current) => ({
+          ...current,
+          [id]: !checked,
+        }));
+        return;
+      }
+
+      if (result.applicant) {
+        setLocalEnrolled((current) => ({
+          ...current,
+          [id]: result.applicant?.enrolled ?? checked,
+        }));
+      }
+
+      setFeedback(
+        result.mode === "mock"
+          ? "Minta módban fut a felület, ezért a változás most csak helyben látható."
+          : "A beiratkozási állapot sikeresen frissült a Supabase adatbázisban."
+      );
+    } catch {
+      setSaveError("Hálózati hiba történt a beiratkozási állapot mentése közben.");
+      setLocalEnrolled((current) => ({
+        ...current,
+        [id]: !checked,
+      }));
+    } finally {
+      setSavingIds((current) => current.filter((item) => item !== id));
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {mode === "mock" ? (
+        <CardPanel className="p-5">
+          <StatusBadge tone="accent">Minta mód</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">
+            A Supabase környezeti változók hiánya miatt ez a nézet most mintaadatokkal működik.
+          </p>
+        </CardPanel>
+      ) : null}
+
+      {error ? (
+        <CardPanel className="p-5">
+          <StatusBadge>Betöltési hiba</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{error}</p>
+        </CardPanel>
+      ) : null}
+
+      {feedback ? (
+        <CardPanel className="p-5">
+          <StatusBadge tone="accent">Mentés kész</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{feedback}</p>
+        </CardPanel>
+      ) : null}
+
+      {saveError ? (
+        <CardPanel className="p-5">
+          <StatusBadge>Mentési hiba</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{saveError}</p>
+        </CardPanel>
+      ) : null}
+
       <CardPanel className="p-5">
         <label className="block max-w-xs">
           <FieldLabel>Osztály szűrő</FieldLabel>
@@ -37,9 +135,16 @@ export function EnrollmentPageClient({ applicants }: { applicants: Applicant[] }
       </CardPanel>
 
       <div className="space-y-4">
+        {visibleApplicants.length === 0 ? (
+          <CardPanel className="p-5 text-sm text-muted-foreground">
+            Jelenleg nincs olyan jelentkező, aki megfelel a kiválasztott szűrőnek.
+          </CardPanel>
+        ) : null}
+
         {visibleApplicants.map((applicant) => {
           const hasSpecialNotes =
             Boolean(applicant.allergies) || applicant.status === "hiányos adat";
+          const isSaving = savingIds.includes(applicant.id);
 
           return (
             <CardPanel
@@ -74,15 +179,13 @@ export function EnrollmentPageClient({ applicants }: { applicants: Applicant[] }
                 <input
                   type="checkbox"
                   checked={localEnrolled[applicant.id] ?? false}
-                  onChange={(event) =>
-                    setLocalEnrolled((current) => ({
-                      ...current,
-                      [applicant.id]: event.target.checked,
-                    }))
-                  }
+                  disabled={isSaving}
+                  onChange={(event) => handleToggle(applicant.id, event.target.checked)}
                   className="h-4 w-4 rounded border-[color:var(--border-strong)]"
                 />
-                <span className="text-sm font-semibold text-foreground">Beiratkozott</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {isSaving ? "Mentés..." : "Beiratkozott"}
+                </span>
               </label>
             </CardPanel>
           );

@@ -1,12 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Applicant, ApplicantStatus } from "@/lib/mock-admin-data";
+import { Applicant, RegistrationDataMode } from "@/lib/registration-types";
 import { ApplicantTable } from "@/components/admin/applicant-table";
 import { FilterBar } from "@/components/admin/filter-bar";
-import { FieldLabel, FormInput } from "@/components/ui-foundations";
+import { CardPanel, FieldLabel, FormInput, StatusBadge } from "@/components/ui-foundations";
 
-export function RegistrationsPageClient({ applicants }: { applicants: Applicant[] }) {
+export function RegistrationsPageClient({
+  applicants,
+  mode,
+  error,
+}: {
+  applicants: Applicant[];
+  mode: RegistrationDataMode;
+  error: string | null;
+}) {
   const [classFilter, setClassFilter] = useState("összes");
   const [statusFilter, setStatusFilter] = useState("összes");
   const [enrollmentFilter, setEnrollmentFilter] = useState("összes");
@@ -33,6 +41,23 @@ export function RegistrationsPageClient({ applicants }: { applicants: Applicant[
 
   return (
     <div className="space-y-6">
+      {mode === "mock" ? (
+        <CardPanel className="p-5">
+          <StatusBadge tone="accent">Minta mód</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">
+            A lista jelenleg a beépített mintaadatokat mutatja, mert a Supabase környezeti
+            változói nincsenek megadva.
+          </p>
+        </CardPanel>
+      ) : null}
+
+      {error ? (
+        <CardPanel className="p-5">
+          <StatusBadge>Betöltési hiba</StatusBadge>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{error}</p>
+        </CardPanel>
+      ) : null}
+
       <FilterBar>
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr_1fr_1fr]">
           <label className="block">

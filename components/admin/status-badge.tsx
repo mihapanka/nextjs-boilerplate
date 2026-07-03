@@ -1,4 +1,4 @@
-import { ApplicantStatus } from "@/lib/mock-admin-data";
+import { ApplicantStatus } from "@/lib/registration-types";
 
 const styles: Record<ApplicantStatus, string> = {
   "új jelentkezés": "border-[#dce7e1] bg-[#f6faf8] text-[#305446]",
