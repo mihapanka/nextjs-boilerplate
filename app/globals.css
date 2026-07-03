@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f0e2;
-  --foreground: #143127;
+  --background: #ffffff;
+  --foreground: #18211d;
+  --muted-foreground: #5f6d66;
+  --border: #ecefed;
+  --border-strong: #dfe5e1;
+  --surface-subtle: #f7f8f8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
   --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace;
 }
@@ -25,9 +30,14 @@ body {
   color: var(--foreground);
   margin: 0;
   min-height: 100vh;
+  font-family: var(--font-sans);
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+::selection {
+  background: #e8eeeb;
 }
